@@ -1,5 +1,7 @@
 import React from 'react'
+import { motion } from 'framer-motion'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+import { CustomTooltip } from './CustomTooltip'
 
 const COLORS = [
   '#3b82f6', // blue
@@ -22,9 +24,15 @@ export default function LanguageChart({ languages, isDarkMode }) {
 
   if (data.length === 0) {
     return (
-      <div className="text-center text-slate-400 dark:text-slate-500 py-8">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className={`text-center py-8 rounded-lg ${
+          isDarkMode ? 'text-slate-400 bg-slate-800/50' : 'text-gray-500 bg-gray-50'
+        }`}
+      >
         No language data available
-      </div>
+      </motion.div>
     )
   }
 
@@ -34,9 +42,18 @@ export default function LanguageChart({ languages, isDarkMode }) {
   }
 
   return (
-    <div className="w-full">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5, delay: 0.2 }}
+      className={`w-full p-6 rounded-lg ${
+        isDarkMode
+          ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700'
+          : 'bg-white border border-gray-200 shadow-sm'
+      }`}
+    >
       <ResponsiveContainer width="100%" height={300}>
-        <PieChart>
+        <PieChart style={{ backgroundColor: 'transparent' }}>
           <Pie
             data={data}
             cx="50%"
@@ -46,17 +63,26 @@ export default function LanguageChart({ languages, isDarkMode }) {
             outerRadius={100}
             fill="#8884d8"
             dataKey="value"
+            animationDuration={1000}
+            animationBegin={0}
           >
             {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              <Cell
+                key={`cell-${index}`}
+                fill={COLORS[index % COLORS.length]}
+                style={{
+                  filter: isDarkMode ? 'brightness(1.1)' : 'brightness(1)',
+                  transition: 'all 0.3s ease',
+                }}
+              />
             ))}
           </Pie>
           <Tooltip
-            contentStyle={{
-              backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-              border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
-              borderRadius: '8px',
-              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+            content={<CustomTooltip isDarkMode={isDarkMode} />}
+            cursor={{
+              fill: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+              stroke: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+              strokeWidth: 1,
             }}
           />
           <Legend
@@ -65,7 +91,6 @@ export default function LanguageChart({ languages, isDarkMode }) {
           />
         </PieChart>
       </ResponsiveContainer>
-    </div>
+    </motion.div>
   )
 }
-

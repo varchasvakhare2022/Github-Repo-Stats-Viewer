@@ -36,11 +36,37 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
     window.addEventListener('mousemove', updateMouse, { passive: true })
 
     const resizeCanvas = () => {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
+      const dpr = window.devicePixelRatio || 1
+      const width = window.innerWidth
+      const height = window.innerHeight
+      
+      // Set actual size in memory (scaled for DPI)
+      canvas.width = width * dpr
+      canvas.height = height * dpr
+      
+      // Reset transformation matrix and scale context to account for DPI
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.scale(dpr, dpr)
+      
+      // Set CSS size (display size, not actual canvas size)
+      canvas.style.width = width + 'px'
+      canvas.style.height = height + 'px'
+      
+      // Reset particle positions to fit new canvas (use display size, not scaled)
+      particles.forEach(particle => {
+        if (particle.x < 0 || particle.x > width) particle.x = Math.random() * width
+        if (particle.y < 0 || particle.y > height) particle.y = Math.random() * height
+      })
     }
     resizeCanvas()
-    window.addEventListener('resize', resizeCanvas, { passive: true })
+    
+    // Debounce resize for better performance
+    let resizeTimeout
+    const debouncedResize = () => {
+      clearTimeout(resizeTimeout)
+      resizeTimeout = setTimeout(resizeCanvas, 150)
+    }
+    window.addEventListener('resize', debouncedResize, { passive: true })
 
     class Particle {
       constructor() {
@@ -155,7 +181,11 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
 
     const initParticles = () => {
       particles = []
-      const particleCount = isDarkMode ? 60 : 50
+      // Reduced particle count for better performance on Railway/hosting
+      // Use devicePixelRatio to adjust for high-DPI displays
+      const pixelRatio = window.devicePixelRatio || 1
+      const baseCount = pixelRatio > 1 ? 35 : 40
+      const particleCount = isDarkMode ? baseCount : baseCount - 5
       for (let i = 0; i < particleCount; i++) {
         particles.push(new Particle())
       }
@@ -221,9 +251,24 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
       })
     }
 
-    const animate = () => {
+    // Performance optimization: detect if page is hidden
+    let lastTime = 0
+    const targetFPS = 60
+    const frameInterval = 1000 / targetFPS
+
+    const animate = (currentTime) => {
       rafId = requestAnimationFrame(animate)
       
+      // Throttle to target FPS for better performance
+      const deltaTime = currentTime - lastTime
+      if (deltaTime < frameInterval) return
+      lastTime = currentTime - (deltaTime % frameInterval)
+
+      // Skip animation if page is hidden
+      if (document.hidden) return
+
+      // Use save/restore for better performance
+      ctx.save()
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
       particles.forEach(particle => {
@@ -235,13 +280,18 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
       particles.forEach(particle => {
         particle.draw()
       })
+      
+      ctx.restore()
     }
 
-    animate()
+    animate(0)
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas)
+      window.removeEventListener('resize', debouncedResize)
       window.removeEventListener('mousemove', updateMouse)
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout)
+      }
       if (rafId) {
         cancelAnimationFrame(rafId)
       }
@@ -252,7 +302,11 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
   }, [isDarkMode])
 
   return (
-    <div ref={containerRef} className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+    <div 
+      ref={containerRef} 
+      className="fixed inset-0 overflow-hidden pointer-events-none -z-10"
+      style={{ willChange: 'transform', transform: 'translateZ(0)' }}
+    >
       <div
         className={`absolute inset-0 ${isDarkMode ? 'opacity-30' : 'opacity-70'}`}
         style={{
@@ -265,7 +319,7 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
 
       <div className="absolute inset-0 overflow-hidden">
         <div
-          className={`absolute -top-40 -left-40 w-[800px] h-[800px] rounded-full blur-[120px] ${
+          className={`animated-background-layer absolute -top-40 -left-40 w-[800px] h-[800px] rounded-full blur-[120px] ${
             isDarkMode
               ? 'bg-gradient-to-r from-emerald-500/40 via-cyan-500/30 to-blue-500/40'
               : 'bg-gradient-to-r from-emerald-400/70 via-cyan-400/65 to-blue-400/70'
@@ -276,7 +330,7 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
         />
         
         <div
-          className={`absolute -top-40 -right-40 w-[900px] h-[900px] rounded-full blur-[140px] ${
+          className={`animated-background-layer absolute -top-40 -right-40 w-[900px] h-[900px] rounded-full blur-[140px] ${
             isDarkMode
               ? 'bg-gradient-to-r from-purple-500/35 via-pink-500/30 to-rose-500/35'
               : 'bg-gradient-to-r from-purple-400/65 via-pink-400/60 to-rose-400/65'
@@ -288,7 +342,7 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
         />
         
         <div
-          className={`absolute -bottom-40 -left-40 w-[850px] h-[850px] rounded-full blur-[130px] ${
+          className={`animated-background-layer absolute -bottom-40 -left-40 w-[850px] h-[850px] rounded-full blur-[130px] ${
             isDarkMode
               ? 'bg-gradient-to-r from-amber-500/30 via-orange-500/25 to-red-500/30'
               : 'bg-gradient-to-r from-amber-400/60 via-orange-400/55 to-red-400/60'
@@ -300,7 +354,7 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
         />
         
         <div
-          className={`absolute -bottom-40 -right-40 w-[750px] h-[750px] rounded-full blur-[110px] ${
+          className={`animated-background-layer absolute -bottom-40 -right-40 w-[750px] h-[750px] rounded-full blur-[110px] ${
             isDarkMode
               ? 'bg-gradient-to-r from-indigo-500/35 via-blue-500/30 to-cyan-500/35'
               : 'bg-gradient-to-r from-indigo-400/65 via-blue-400/60 to-cyan-400/65'
@@ -312,7 +366,7 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
         />
         
         <div
-          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[100px] ${
+          className={`animated-background-layer absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[100px] ${
             isDarkMode
               ? 'bg-gradient-to-r from-violet-500/25 via-purple-500/20 to-fuchsia-500/25'
               : 'bg-gradient-to-r from-violet-400/55 via-purple-400/50 to-fuchsia-400/55'
@@ -364,12 +418,14 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
         style={{ 
           mixBlendMode: isDarkMode ? 'screen' : 'normal',
           opacity: isDarkMode ? 1.0 : 1.0,
+          willChange: 'contents',
+          transform: 'translateZ(0)', // GPU acceleration
         }}
       />
 
       <div className="absolute inset-0 overflow-hidden">
         <div
-          className={`absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-[150px] ${
+          className={`animated-background-layer absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-[150px] ${
             isDarkMode ? 'bg-emerald-500/25' : 'bg-emerald-400/55'
           }`}
           style={{
@@ -380,7 +436,7 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
           }}
         />
         <div
-          className={`absolute bottom-1/4 right-1/4 w-[420px] h-[420px] rounded-full blur-[160px] ${
+          className={`animated-background-layer absolute bottom-1/4 right-1/4 w-[420px] h-[420px] rounded-full blur-[160px] ${
             isDarkMode ? 'bg-cyan-500/20' : 'bg-cyan-400/50'
           }`}
           style={{
@@ -392,7 +448,7 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
           }}
         />
         <div
-          className={`absolute top-1/2 right-1/3 w-80 h-80 rounded-full blur-[140px] ${
+          className={`animated-background-layer absolute top-1/2 right-1/3 w-80 h-80 rounded-full blur-[140px] ${
             isDarkMode ? 'bg-blue-500/20' : 'bg-blue-400/50'
           }`}
           style={{
@@ -404,7 +460,7 @@ const AnimatedBackground = memo(function AnimatedBackground({ isDarkMode }) {
           }}
         />
         <div
-          className={`absolute bottom-1/3 left-1/3 w-72 h-72 rounded-full blur-[130px] ${
+          className={`animated-background-layer absolute bottom-1/3 left-1/3 w-72 h-72 rounded-full blur-[130px] ${
             isDarkMode ? 'bg-purple-500/18' : 'bg-purple-400/48'
           }`}
           style={{
